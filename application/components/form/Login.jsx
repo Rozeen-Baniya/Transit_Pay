@@ -12,8 +12,10 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import '../../global.css';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login = ({ navigation }) => {
+  const { setAuthenticated } = useAuth();
   const [isEnabled, setIsEnabled] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,11 +54,14 @@ const Login = ({ navigation }) => {
       const data = response.data;
 
       // ✅ Success
+      // Store token in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      
+      // Update auth state immediately to trigger navigation
+      setAuthenticated(true);
+      
       Alert.alert('Login Successful', `Welcome back!`);
       console.log('User Data:', data);
-
-      // Example: store token in AsyncStorage
-      await AsyncStorage.setItem('token', data.token);
 
     } catch (error) {
       console.error(error);
