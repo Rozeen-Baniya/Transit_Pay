@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
 import NavigationHandler from './components/Root/NavigationHandler';
 import MainAppNavigation from './components/Root/MainAppNavigation';
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const AppContent = () => {
