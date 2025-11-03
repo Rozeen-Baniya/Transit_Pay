@@ -13,6 +13,7 @@ import java.util.*
 
 /**
  * Created by Qifan on 05/12/2018.
+ * REPO: https://github.com/underwindfall/NFCAndroid
  */
 
 class KHostApduService : HostApduService() {
