@@ -7,6 +7,11 @@ const walletSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    held: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
     userType: {
       type: String,
       enum: ["User", "Org", "Ward"],

@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const Wallet = require("../models/wallet.model");
 const Transaction = require("../models/transaction.model");
 const currencyService = require("../services/currency.service");
+const emailService = require('../services/email.service');
+const crypto = require('crypto');
+// mongoose already required above
+const User = require('../models/user.model');
+const { emitToUser, emitToWallet } = require('../services/socket.service');
 
 // Create a new wallet
 exports.createWallet = async (req, res) => {
@@ -272,6 +277,15 @@ exports.deductFare = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    // Emit real-time updates: balance and transaction
+    try {
+      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
+      emitToUser(wallet.userId.toString(), 'transaction:new', { transaction, wallet: { id: wallet._id, balance: wallet.balance } });
+      emitToWallet(wallet._id.toString(), 'transaction:new', { transaction });
+    } catch (e) {
+      console.warn('Socket emit warning (deductFare):', e.message);
+    }
+
     return res.json({ 
       transaction,
       wallet: {
@@ -286,5 +300,307 @@ exports.deductFare = async (req, res) => {
     session.endSession();
     console.error("Deduct fare error:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Initiate a top-up: creates a pending topup transaction and returns a mock payment payload
+exports.initiateTopUp = async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const { amount, currency, idempotencyKey } = req.body;
+    const userId = req.userId;
+
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+
+    // Create pending topup transaction
+    const tx = await Transaction.create({
+      walletId,
+      userId,
+      type: 'topup',
+      status: 'pending',
+      amount,
+      sourceCurrency: currency || 'NPR',
+      targetCurrency: currency || 'NPR',
+      idempotencyKey: idempotencyKey || crypto.randomBytes(12).toString('hex')
+    });
+
+    // Mock payment provider response (client would use this to complete payment)
+    const paymentPayload = {
+      provider: process.env.PAYMENT_PROVIDER || 'mock',
+      clientSecret: crypto.randomBytes(24).toString('hex'),
+      transactionId: tx._id
+    };
+
+    return res.status(201).json({ transaction: tx, paymentPayload });
+  } catch (error) {
+    console.error('Initiate topup error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Confirm top-up (simulate webhook or client callback) — completes pending topup and credits wallet
+exports.confirmTopUp = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { walletId } = req.params;
+    const { transactionId, providerReference } = req.body;
+
+    const tx = await Transaction.findById(transactionId).session(session);
+    if (!tx) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Transaction not found' });
+    }
+    if (tx.status !== 'pending' || tx.type !== 'topup') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Transaction not eligible for confirmation' });
+    }
+
+    const wallet = await Wallet.findById(walletId).session(session);
+    if (!wallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    // Credit wallet
+    wallet.balance += tx.amount;
+    wallet.history.push({ title: 'Top-up', amount: tx.amount, uuid: tx._id, date: new Date(), remarks: 'Wallet top-up' });
+    await wallet.save({ session });
+
+    tx.status = 'completed';
+    tx.reference = providerReference;
+    await tx.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+    // Send receipt
+    const receipt = {
+      id: tx._id,
+      type: tx.type,
+      amount: tx.amount,
+      currency: tx.sourceCurrency,
+      status: tx.status,
+      date: tx.updatedAt || tx.createdAt
+    };
+    try {
+      const user = await User.findById(wallet.userId);
+      if (user && user.email) emailService.sendTransactionReceipt(user.email, receipt);
+    } catch (e) {
+      console.warn('Could not send receipt email:', e.message);
+    }
+
+    // Emit real-time update for top-up
+    try {
+      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
+      emitToUser(wallet.userId.toString(), 'wallet:topup', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance } });
+      emitToWallet(wallet._id.toString(), 'wallet:topup', { transaction: tx });
+    } catch (e) {
+      console.warn('Socket emit warning (confirmTopUp):', e.message);
+    }
+
+    return res.json({ transaction: tx, wallet });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Confirm topup error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Pre-authorize (place a hold)
+exports.preauthorize = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { walletId } = req.params;
+    const { amount, currency, idempotencyKey } = req.body;
+    const userId = req.userId;
+
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+
+    const wallet = await Wallet.findById(walletId).session(session);
+    if (!wallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    // Security check
+    if (wallet.userId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (wallet.balance < amount) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(402).json({ message: 'Insufficient funds' });
+    }
+
+    // Deduct from available balance and increase held
+    wallet.balance -= amount;
+    wallet.held = (wallet.held || 0) + amount;
+    wallet.history.push({ title: 'Pre-authorization hold', amount: -amount, uuid: idempotencyKey || crypto.randomBytes(8).toString('hex'), date: new Date(), remarks: 'Hold for preauth' });
+    await wallet.save({ session });
+
+    const tx = new Transaction({ walletId, userId, type: 'preauth', status: 'authorized', amount, sourceCurrency: currency || 'NPR', targetCurrency: currency || 'NPR', idempotencyKey });
+    await tx.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Emit preauth created and balance/held update
+    try {
+      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
+      emitToUser(wallet.userId.toString(), 'preauth:created', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance, held: wallet.held } });
+      emitToWallet(wallet._id.toString(), 'preauth:created', { transaction: tx });
+    } catch (e) {
+      console.warn('Socket emit warning (preauthorize):', e.message);
+    }
+
+    return res.status(201).json({ transaction: tx, wallet });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Preauthorize error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Capture a preauth (finalize the hold into a completed fare/transaction)
+exports.capturePreauth = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { walletId, txId } = req.params;
+    const wallet = await Wallet.findById(walletId).session(session);
+    if (!wallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    const tx = await Transaction.findById(txId).session(session);
+    if (!tx || tx.type !== 'preauth' || tx.status !== 'authorized') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Transaction not capturable' });
+    }
+
+    // Move held to completed (held already removed from balance when preauth created)
+    wallet.held = (wallet.held || 0) - tx.amount;
+    wallet.history.push({ title: 'Capture preauth', amount: -tx.amount, uuid: tx._id, date: new Date(), remarks: 'Captured preauth' });
+    await wallet.save({ session });
+
+    tx.status = 'completed';
+    await tx.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Send receipt
+    const receipt = { id: tx._id, type: tx.type, amount: tx.amount, currency: tx.sourceCurrency, status: tx.status, date: tx.updatedAt || tx.createdAt };
+    try {
+      const user = await User.findById(wallet.userId);
+      if (user && user.email) emailService.sendTransactionReceipt(user.email, receipt);
+    } catch (e) {
+      console.warn('Could not send receipt email:', e.message);
+    }
+
+    // Emit capture completed and balance update
+    try {
+      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
+      emitToUser(wallet.userId.toString(), 'preauth:captured', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance } });
+      emitToWallet(wallet._id.toString(), 'preauth:captured', { transaction: tx });
+    } catch (e) {
+      console.warn('Socket emit warning (capturePreauth):', e.message);
+    }
+
+    return res.json({ transaction: tx, wallet });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Capture preauth error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Release a preauth (void the hold and return funds to wallet)
+exports.releasePreauth = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { walletId, txId } = req.params;
+    const wallet = await Wallet.findById(walletId).session(session);
+    if (!wallet) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    const tx = await Transaction.findById(txId).session(session);
+    if (!tx || tx.type !== 'preauth' || tx.status !== 'authorized') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Transaction not releasable' });
+    }
+
+    // Release held funds back to balance
+    wallet.held = (wallet.held || 0) - tx.amount;
+    wallet.balance += tx.amount;
+    wallet.history.push({ title: 'Release preauth', amount: tx.amount, uuid: tx._id, date: new Date(), remarks: 'Released preauth' });
+    await wallet.save({ session });
+
+    tx.status = 'released';
+    await tx.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Emit release event and balance update
+    try {
+      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
+      emitToUser(wallet.userId.toString(), 'preauth:released', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance } });
+      emitToWallet(wallet._id.toString(), 'preauth:released', { transaction: tx });
+    } catch (e) {
+      console.warn('Socket emit warning (releasePreauth):', e.message);
+    }
+
+    return res.json({ transaction: tx, wallet });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Release preauth error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get receipt (JSON) for a transaction
+exports.getReceipt = async (req, res) => {
+  try {
+    const { walletId, txId } = req.params;
+    const tx = await Transaction.findById(txId);
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+
+    const receipt = {
+      id: tx._id,
+      type: tx.type,
+      status: tx.status,
+      amount: tx.amount,
+      currency: tx.sourceCurrency,
+      date: tx.updatedAt || tx.createdAt,
+      walletId: tx.walletId,
+      reference: tx.reference || null,
+      meta: tx.meta || null
+    };
+
+    return res.json({ receipt });
+  } catch (error) {
+    console.error('Get receipt error:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 };

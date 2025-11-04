@@ -6,6 +6,9 @@ const { initializeRBAC } = require("./services/rbac.service");
 
 dotenv.config();
 
+const http = require('http');
+const { initSocket } = require('./services/socket.service');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -45,6 +48,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/wards", require("./routes/ward.routes"));
+app.use("/api/locations", require("./routes/location.routes"));
 app.use("/api/card-requests", require("./routes/card.request.routes"));
 app.use("/api/wallets", require("./routes/wallet.routes"));
 app.use("/api/rbac/roles", require("./routes/role.routes"));
@@ -56,10 +60,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-}
+// Create HTTP server so we can attach socket.io
+const server = http.createServer(app);
 
-module.exports = app;
+// Initialize socket.io
+initSocket(server);
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+module.exports = { app, server };

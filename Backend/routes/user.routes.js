@@ -17,4 +17,14 @@ router.get("/me/:userId", auth, userController.me);
 // Temporary route to list users (remove in production)
 router.get("/list-all", userController.listAllUsers);
 
+// Password reset flow
+router.post('/request-password-reset', userController.requestPasswordReset);
+router.post('/reset-password', userController.resetPassword);
+
+// Admin unlock user (requires auth + admin role check in controller)
+router.post('/unlock/:userId', auth, userController.unlockUser);
+// Refresh token and session management
+router.post('/refresh-token', userController.refreshToken);
+router.post('/logout', userController.logout);
+
 module.exports = router;
