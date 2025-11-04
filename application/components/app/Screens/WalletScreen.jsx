@@ -3,15 +3,11 @@ import {
   TextInput,
   View,
   TouchableOpacity,
-  Text,
-  ViewBase,
-  Image,
+  Text
 } from 'react-native';
 import React from 'react';
 import { ScrollView } from 'react-native-gesture-handler';
 import {
-  Building,
-  ChevronLeft,
   ChevronRight,
   Search,
   Wallet,
@@ -41,7 +37,6 @@ const WalletScreen = () => {
           <Text className="text-white text-xs m">
             <Text className="text-yellow-300 font-bold text-lg">120</Text> km
           </Text>
-
         </View>
         <View className="absolute flex-row items-center h-12 w-[80%] bg-white -bottom-6 left-[17%] shadow-2xl rounded-xl px-3">
           <TextInput
@@ -69,7 +64,7 @@ const WalletScreen = () => {
           </View>
         </View>
         <View className="h-[1px] w-[90%] mx-auto bg-gray-500"></View>
-       <View className=" w-full mt-3 px-5 pb-4 flex-row justify-between items-center">
+        <View className=" w-full mt-3 px-5 pb-4 flex-row justify-between items-center">
           <Text className="text-white text-xs">
             <Text className="text-yellow-300 font-bold text-lg">12</Text> TC
           </Text>
@@ -78,8 +73,10 @@ const WalletScreen = () => {
             <ChevronRight size={12} color={'purple'} />
           </View>
         </View>
-        </View>
-   
+      </View>
+      <View className=''> 
+        
+      </View>
     </ScrollView>
   );
 };
