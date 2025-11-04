@@ -26,12 +26,12 @@ const transactionSchema = new mongoose.Schema({
     // Transaction type and status
     type: { 
         type: String, 
-        enum: ["topup", "fare", "refund", "adjustment", "transfer", "fee"], 
+        enum: ["topup", "fare", "refund", "adjustment", "transfer", "fee", "preauth"], 
         required: true 
     },
     status: { 
         type: String, 
-        enum: ["pending", "completed", "failed", "reversed", "disputed"], 
+        enum: ["pending", "authorized", "completed", "failed", "released", "reversed", "disputed"], 
         default: "pending" 
     },
     
