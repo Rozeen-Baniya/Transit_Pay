@@ -39,31 +39,9 @@ const transportSchema = new mongoose.Schema(
         type: [Number],
         default: [0, 0]
       },
-      speed: {
-        type: Number,
-        default: 0
-      },
-      heading: {
-        type: Number,
-        default: 0
-      },
-      timestamp: {
+      lastUpdated: {
         type: Date,
         default: Date.now
-      }
-    },
-    connectionState: {
-      isOnline: {
-        type: Boolean,
-        default: false
-      },
-      lastSeen: {
-        type: Date,
-        default: Date.now
-      },
-      socketId: {
-        type: String,
-        default: null
       }
     },
     capacity: {

@@ -5,9 +5,7 @@ const Transaction = require("../models/transaction.model");
 const currencyService = require("../services/currency.service");
 const emailService = require('../services/email.service');
 const crypto = require('crypto');
-// mongoose already required above
 const User = require('../models/user.model');
-const { emitToUser, emitToWallet } = require('../services/socket.service');
 
 // Create a new wallet
 exports.createWallet = async (req, res) => {
@@ -277,14 +275,7 @@ exports.deductFare = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Emit real-time updates: balance and transaction
-    try {
-      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
-      emitToUser(wallet.userId.toString(), 'transaction:new', { transaction, wallet: { id: wallet._id, balance: wallet.balance } });
-      emitToWallet(wallet._id.toString(), 'transaction:new', { transaction });
-    } catch (e) {
-      console.warn('Socket emit warning (deductFare):', e.message);
-    }
+
 
     return res.json({ 
       transaction,
@@ -392,14 +383,7 @@ exports.confirmTopUp = async (req, res) => {
       console.warn('Could not send receipt email:', e.message);
     }
 
-    // Emit real-time update for top-up
-    try {
-      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
-      emitToUser(wallet.userId.toString(), 'wallet:topup', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance } });
-      emitToWallet(wallet._id.toString(), 'wallet:topup', { transaction: tx });
-    } catch (e) {
-      console.warn('Socket emit warning (confirmTopUp):', e.message);
-    }
+
 
     return res.json({ transaction: tx, wallet });
   } catch (error) {
@@ -453,14 +437,7 @@ exports.preauthorize = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Emit preauth created and balance/held update
-    try {
-      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
-      emitToUser(wallet.userId.toString(), 'preauth:created', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance, held: wallet.held } });
-      emitToWallet(wallet._id.toString(), 'preauth:created', { transaction: tx });
-    } catch (e) {
-      console.warn('Socket emit warning (preauthorize):', e.message);
-    }
+
 
     return res.status(201).json({ transaction: tx, wallet });
   } catch (error) {
@@ -511,14 +488,7 @@ exports.capturePreauth = async (req, res) => {
       console.warn('Could not send receipt email:', e.message);
     }
 
-    // Emit capture completed and balance update
-    try {
-      emitToUser(wallet.userId.toString(), 'wallet:balance', { walletId: wallet._id, balance: wallet.balance, held: wallet.held });
-      emitToUser(wallet.userId.toString(), 'preauth:captured', { transaction: tx, wallet: { id: wallet._id, balance: wallet.balance } });
-      emitToWallet(wallet._id.toString(), 'preauth:captured', { transaction: tx });
-    } catch (e) {
-      console.warn('Socket emit warning (capturePreauth):', e.message);
-    }
+
 
     return res.json({ transaction: tx, wallet });
   } catch (error) {

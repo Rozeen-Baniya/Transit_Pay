@@ -6,9 +6,6 @@ const { initializeRBAC } = require("./services/rbac.service");
 
 dotenv.config();
 
-const http = require('http');
-const { initSocket } = require('./services/socket.service');
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -60,13 +57,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-// Create HTTP server so we can attach socket.io
-const server = http.createServer(app);
-
-// Initialize socket.io
-initSocket(server);
-
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
