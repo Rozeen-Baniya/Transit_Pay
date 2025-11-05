@@ -33,7 +33,7 @@ const data = [
   },
 ];
 
-const WalletScreen = () => {
+const WalletScreen = ({navigation}) => {
   return (
     <ScrollView className="flex-1 bg-white">
       <View className="w-screen pt-14 h-60 bg-blue-500 rounded-b-[15%] relative px-6 pt-10">
@@ -120,7 +120,7 @@ const WalletScreen = () => {
               </Text>
             </View>
           ))}
-          <TouchableOpacity>
+          <TouchableOpacity onPress={()=> navigation.navigate("Transactions")}>
             <Text className="text-center text-blue-500 py-4 font-semibold">
               See All Transactions
             </Text>
