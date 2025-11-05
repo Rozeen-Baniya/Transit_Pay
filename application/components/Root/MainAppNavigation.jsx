@@ -7,6 +7,7 @@ import WelcomeScreen from '../app/WelcomeScreen';
 import Login from '../form/Login';
 import { Home, CreditCard, User } from 'lucide-react-native';
 import WalletScreen from '../app/Screens/WalletScreen';
+import CardScreen from '../app/Screens/CardScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -17,11 +18,7 @@ const Stack = createStackNavigator();
 const CardsTab = () => {
   return (
     <View className="flex-1 items-center justify-center bg-white">
-      <CreditCard size={48} color="#3B82F6" />
-      <Text className="mt-4 text-xl font-semibold text-gray-700">My Cards</Text>
-      <Text className="mt-2 text-gray-500">
-        Manage your transit and payment cards
-      </Text>
+      <CardScreen/>
     </View>
   );
 };
