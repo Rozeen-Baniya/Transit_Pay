@@ -12,8 +12,7 @@ const NavigationHandler = () => {
         <NavigationContainer>
             <Stack.Navigator initialRouteName='Welcome'>
                 <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-                <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
-                
+                <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />      
             </Stack.Navigator>
         </NavigationContainer>
     )
