@@ -15,9 +15,15 @@ const cardRequestSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ["Pending", "Approved", "Rejected"],
+      enum: ["Pending", "Approved", "Rejected", "Blocked", "Unblocked"],
       default: "Pending",
     },
+    cardId: { type: mongoose.Schema.Types.ObjectId, ref: 'Card' }, // Link to the actual Card if approved
+    cardType: { // To specify the type of card being requested
+      type: String,
+      enum: ['Student', 'Senior', 'Regular', 'Staff'],
+      default: 'Regular'
+    }
   },
   { timestamps: true }
 );

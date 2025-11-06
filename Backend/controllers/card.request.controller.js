@@ -4,6 +4,7 @@ const User = require("../models/user.model");
 const Org = require("../models/org.model");
 const Ward = require("../models/ward.model");
 const bcrypt = require("bcryptjs");
+const Card = require("../models/card.model"); // Import the new Card model
 
 // Create a new card request
 exports.createCardRequest = async (req, res) => {
@@ -145,5 +146,162 @@ exports.verifyKYC = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Block a card
+exports.blockCard = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    const { reason } = req.body; // Optional reason for blocking
+
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    if (card.status === 'Blocked') {
+      return res.status(400).json({ message: 'Card is already blocked' });
+    }
+
+    card.status = 'Blocked';
+    await card.save();
+
+    // Optionally, create a CardRequest entry to log the blocking action
+    await CardRequest.create({
+      requesterType: 'User', // Or an Admin user type if applicable
+      requesterId: req.userId, // Assuming userId is available from auth middleware
+      status: 'Blocked',
+      cardId: card._id,
+      meta: { reason: reason || 'Blocked by user request' }
+    });
+
+    res.status(200).json({ message: 'Card blocked successfully', card });
+  } catch (error) {
+    console.error('Error blocking card:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Unblock a card
+exports.unblockCard = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    const { reason } = req.body; // Optional reason for unblocking
+
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    if (card.status === 'Active') {
+      return res.status(400).json({ message: 'Card is already active (unblocked)' });
+    }
+
+    card.status = 'Active'; // Or a more appropriate unblocked status
+    await card.save();
+
+    // Optionally, create a CardRequest entry to log the unblocking action
+    await CardRequest.create({
+      requesterType: 'User', // Or an Admin user type if applicable
+      requesterId: req.userId, // Assuming userId is available from auth middleware
+      status: 'Unblocked',
+      cardId: card._id,
+      meta: { reason: reason || 'Unblocked by user request' }
+    });
+
+    res.status(200).json({ message: 'Card unblocked successfully', card });
+  } catch (error) {
+    console.error('Error unblocking card:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get a card by ID
+exports.getCardById = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+    res.status(200).json({ card });
+  } catch (error) {
+    console.error('Error fetching card:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update card type (e.g., from Regular to Student)
+exports.updateCardType = async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    const { cardType } = req.body;
+
+    if (!cardType || !['Student', 'Senior', 'Regular', 'Staff'].includes(cardType)) {
+      return res.status(400).json({ message: 'Invalid card type provided' });
+    }
+
+    const card = await Card.findById(cardId);
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    card.cardType = cardType;
+    await card.save();
+
+    // Optionally, create a CardRequest entry to log the change
+    await CardRequest.create({
+      requesterType: 'User', // Or Admin
+      requesterId: req.userId,
+      status: 'Approved', // Assuming this is an approved change
+      cardId: card._id,
+      cardType: cardType,
+      meta: { action: 'Card type updated' }
+    });
+
+    res.status(200).json({ message: 'Card type updated successfully', card });
+  } catch (error) {
+    console.error('Error updating card type:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Create a new card (e.g., by an admin after a request is approved)
+exports.createCard = async (req, res) => {
+  try {
+    const { nfcId, ownerId, ownerType, cardType, expiryDate, balance } = req.body;
+
+    // Basic validation
+    if (!nfcId || !ownerId || !ownerType || !cardType) {
+      return res.status(400).json({ message: 'Missing required card details' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(ownerId)) {
+      return res.status(400).json({ message: 'Invalid ownerId format' });
+    }
+
+    // Check if NFC ID already exists
+    const existingCard = await Card.findOne({ nfcId });
+    if (existingCard) {
+      return res.status(400).json({ message: 'Card with this NFC ID already exists' });
+    }
+
+    const newCard = new Card({
+      nfcId,
+      ownerId,
+      ownerType,
+      cardType,
+      expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+      balance: balance || 0,
+      status: 'Active'
+    });
+
+    await newCard.save();
+
+    res.status(201).json({ message: 'Card created successfully', card: newCard });
+
+  } catch (error) {
+    console.error('Error creating card:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
