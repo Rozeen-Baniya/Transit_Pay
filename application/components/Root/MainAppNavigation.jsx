@@ -9,7 +9,7 @@ import Login from '../form/Login';
 import WalletScreen from '../app/Screens/WalletScreen';
 import CardScreen from '../app/Screens/CardScreen';
 import TransactionScreen from '../app/Screens/TransactionScreen';
-import { Home, CreditCard, User, Receipt } from 'lucide-react-native';
+import { Home, CreditCard, User, Receipt, Bus } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -20,6 +20,13 @@ const HomeStack = () => (
     <Stack.Screen name="WalletScreen" component={WalletScreen} />
   </Stack.Navigator>
 );
+
+const TripStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="WalletScreen" component={WalletScreen} />
+  </Stack.Navigator>
+);
+
 
 const CardsStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -101,7 +108,16 @@ const TabNavigator = () => (
         tabBarLabel: 'Transactions',
       }}
     />
-    
+    <Tab.Screen
+      name="Trips"
+      component={TripStack}
+      options={{
+        tabBarIcon: ({ color, size }) => (
+          <Bus size={size} color={color} /> // ✅ Better icon
+        ),
+        tabBarLabel: 'Trips',
+      }}
+    />
     <Tab.Screen
       name="Profile"
       component={ProfileStack}
