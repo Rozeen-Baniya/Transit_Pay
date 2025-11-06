@@ -5,6 +5,7 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 
 // --- PN532 SPI Pins ---
 #define PN532_SS   D4
@@ -19,42 +20,69 @@ const char* apiHost = "https://codarambha-git-force-transit-pay-ba.vercel.app";
 
 Adafruit_PN532 nfc(PN532_SS);
 
+const int MAX_REDIRECTS = 5;
+
+// Function to send GET request with redirect handling
 void sendPayload(String payload) {
- if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Skipping API request.");
     return;
   }
 
-  WiFiClient client;
+  WiFiClientSecure client;
+  client.setInsecure(); // Skip SSL verification (for testing)
+
   HTTPClient http;
+  String url = apiHost; // initial URL
+  int redirectCount = 0;
 
-  Serial.println("Sending GET request to API root...");
-  http.begin(client, apiHost);
-  int httpResponseCode = http.GET();
+  while (redirectCount < MAX_REDIRECTS) {
+    Serial.println("Sending GET request to: " + url);
+    http.begin(client, url);
+    int httpResponseCode = http.GET();
 
-  if (httpResponseCode > 0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    String response = http.getString();
-    Serial.println("Server Response: " + response);
+    if (httpResponseCode > 0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
 
-    // Success beep
-    if (httpResponseCode == 200) {
-      tone(BUZZER_PIN, 2500, 700);
+      if (httpResponseCode == 200) {
+        String response = http.getString();
+        Serial.println("Server Response: " + response);
+        tone(BUZZER_PIN, 2500, 700); // success beep
+        break; // done
+      }
+      else if (httpResponseCode == 308 || httpResponseCode == 301 || httpResponseCode == 302) {
+        // Handle redirect
+        url = http.getLocation();
+        Serial.println("Redirected to: " + url);
+        redirectCount++;
+        http.end(); // end current connection before retrying
+        delay(100);
+        continue;
+      } else {
+        Serial.println("Error response from server.");
+        tone(BUZZER_PIN, 500, 1000); // failure beep
+        break;
+      }
     } else {
-      tone(BUZZER_PIN, 500, 1000);
-    }
-  } else {
-    Serial.print("HTTP GET Failed: ");
-    Serial.println(http.errorToString(httpResponseCode));
-    // Fast failure beep
-    for (int i = 0; i < 3; i++) {
-      tone(BUZZER_PIN, 1000);
-      delay(100);
-      noTone(BUZZER_PIN);
-      delay(100);
+      Serial.print("HTTP GET Failed: ");
+      Serial.println(http.errorToString(httpResponseCode));
+      // Fast failure beep
+      for (int i = 0; i < 3; i++) {
+        tone(BUZZER_PIN, 1000);
+        delay(100);
+        noTone(BUZZER_PIN);
+        delay(100);
+      }
+      break;
     }
   }
+
+  if (redirectCount >= MAX_REDIRECTS) {
+    Serial.println("Too many redirects. Aborting request.");
+    tone(BUZZER_PIN, 500, 1000);
+  }
+
   http.end();
 }
 
@@ -62,6 +90,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(BUZZER_PIN, OUTPUT);
 
+  // WiFi setup with WiFiManager
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(120);
 
@@ -168,9 +197,8 @@ void loop() {
 
   Serial.println("NDEF Payload: " + payload);
 
-  // Send via GET request
+  // Send payload via GET request
   sendPayload(payload);
-  tone(BUZZER_PIN, 2500, 700);
 
   delay(1000); // Wait before next card read
 }
