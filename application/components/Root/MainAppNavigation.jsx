@@ -9,6 +9,8 @@ import Login from '../form/Login';
 import WalletScreen from '../app/Screens/WalletScreen';
 import CardScreen from '../app/Screens/CardScreen';
 import TransactionScreen from '../app/Screens/TransactionScreen';
+import TripScreen from '../app/Screens/TripScreen';
+import ProfileScreen from '../app/Screens/ProfileScreen'
 import { Home, CreditCard, User, Receipt, Bus } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
@@ -23,7 +25,7 @@ const HomeStack = () => (
 
 const TripStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="WalletScreen" component={WalletScreen} />
+    <Stack.Screen name="TripScreen" component={TripScreen} />
   </Stack.Navigator>
 );
 
@@ -44,15 +46,7 @@ const ProfileStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen
       name="Profile"
-      component={() => (
-        <View className="flex-1 items-center justify-center bg-white">
-          <User size={48} color="#3B82F6" />
-          <Text className="mt-4 text-xl font-semibold text-gray-700">
-            My Profile
-          </Text>
-          <Text className="mt-2 text-gray-500">Edit your profile</Text>
-        </View>
-      )}
+      component={ProfileScreen}
     />
   </Stack.Navigator>
 );

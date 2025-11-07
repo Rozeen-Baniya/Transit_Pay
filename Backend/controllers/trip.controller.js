@@ -6,6 +6,17 @@ const geoService = require('../services/geo.service');
 const walletController = require('./wallet.controller');
 const fareService = require('../services/fare.service');
 
+
+
+// change needed asap 
+// 1) single function to handle both board and exit
+// 2) proper error handling and status codes
+// fare and departure and arrivals to be hardcoded for MVP
+
+
+
+
+
 // User boards a bus
 exports.boardBus = async (req, res) => {
   try {
