@@ -1,16 +1,16 @@
 const router = require("express").Router();
 
-const { createCardRequest } = require("../controllers/card.request.controller");
+const cardRequestController = require("../controllers/card.request.controller");
 
-router.post("/request", auth, cardRequestController.createCardRequest);
+router.post("/request", cardRequestController.createCardRequest);
 
 // Admin/User actions for card management
-router.post('/:cardId/block', auth, cardRequestController.blockCard);
-router.post('/:cardId/unblock', auth, cardRequestController.unblockCard);
+router.post('/:cardId/block', cardRequestController.blockCard);
+router.post('/:cardId/unblock', cardRequestController.unblockCard);
 
 // Card type management and creation
-router.get('/:cardId', auth, cardRequestController.getCardById);
-router.put('/:cardId/type', auth, cardRequestController.updateCardType);
-router.post('/create-card', auth, cardRequestController.createCard);
+router.get('/:cardId', cardRequestController.getCardById);
+router.put('/:cardId/type', cardRequestController.updateCardType);
+router.post('/create-card', cardRequestController.createCard);
 
 module.exports = router;

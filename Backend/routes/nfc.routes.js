@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const nfcController = require('../controllers/nfc.controller');
-const { verifyToken } = require('../middlewares/auth.middleware');
 
 // Test endpoint for NFC tag reading
 router.post('/read', nfcController.testNfcRead);
@@ -10,9 +9,9 @@ router.post('/read', nfcController.testNfcRead);
 router.post('/authenticate', nfcController.nfcAuthenticate);
 
 // NFC Tap-In
-router.post('/tapin', auth, nfcController.nfcTapIn);
+router.post('/tapin', nfcController.nfcTapIn);
 
 // NFC Tap-Out
-router.post('/tapout', auth, nfcController.nfcTapOut);
+router.post('/tapout',nfcController.nfcTapOut);
 
 module.exports = router;

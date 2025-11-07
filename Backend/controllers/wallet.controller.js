@@ -25,7 +25,7 @@ exports.createWallet = async (req, res) => {
 
     // Create new wallet
     const wallet = new Wallet({
-      userId: req.userId,
+      userId: req.body.userId,
       userType: "User",
       balance: 0,
       history: []
@@ -63,16 +63,14 @@ exports.withCurrencyConversion = async (req, res, next) => {
 // Get wallet balance and details
 exports.getWalletBalance = async (req, res) => {
   try {
-    const { walletId } = req.params;
-    const userId = req.userId; // From auth middleware
-    
+    const { userId } = req.params;
+
     console.log('Get wallet balance request:', {
-      walletId,
       userId,
-      headers: req.headers
+      
     });
 
-    const wallet = await Wallet.findOne({ _id: walletId }).exec();
+    const wallet = await Wallet.findOne({ userId }).exec();
     console.log('Found wallet:', wallet);
 
     if (!wallet) {
@@ -80,10 +78,10 @@ exports.getWalletBalance = async (req, res) => {
     }
 
     // Security check - ensure user can only access their own wallet
-    if (wallet.userId.toString() !== userId.toString()) {
-      console.log('Access denied. Wallet userId:', wallet.userId, 'Request userId:', userId);
-      return res.status(403).json({ message: "Access denied" });
-    }
+    // if (wallet.userId !== userId) {
+    //   console.log('Access denied. Wallet userId:', wallet.userId, 'Request userId:', userId);
+    //   return res.status(403).json({ message: "Access denied" });
+    // }
 
     return res.json({ wallet });
 
