@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const cardSchema = new mongoose.Schema(
   {
-    nfcId: { type: String, required: true, unique: true, trim: true },
+    nfcId: { type: String, unique: true, trim: true },
     ownerType: { type: String, required: true, enum: ['User', 'Org', 'Ward'] },
     ownerId: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'ownerType' },
     cardType: {
@@ -17,7 +17,6 @@ const cardSchema = new mongoose.Schema(
     },
     issueDate: { type: Date, default: Date.now },
     expiryDate: { type: Date },
-    balance: { type: Number, default: 0 }, // For pre-paid cards
     meta: { type: mongoose.Schema.Types.Mixed }
   },
   { timestamps: true }

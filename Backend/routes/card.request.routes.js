@@ -8,6 +8,9 @@ router.post("/request", cardRequestController.createCardRequest);
 router.post('/:cardId/block', cardRequestController.blockCard);
 router.post('/:cardId/unblock', cardRequestController.unblockCard);
 
+// kyc verification
+router.post('/verify', cardRequestController.verifyKYC);
+
 // Card type management and creation
 router.get('/:cardId', cardRequestController.getCardById);
 router.put('/:cardId/type', cardRequestController.updateCardType);

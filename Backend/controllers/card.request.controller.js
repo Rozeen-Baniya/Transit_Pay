@@ -81,6 +81,20 @@ exports.createCardRequest = async (req, res) => {
   }
 };
 
+
+const createCard1 = async ({nfcId, ownerId, ownerType, cardType, expiryDate}) => {
+  return await Card.create({
+    nfcId,
+    ownerType,
+    ownerId,
+    cardType,
+    status: "Active",
+    expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+    balance: 0
+  });
+}
+
+
 // ✅ Verify KYC
 exports.verifyKYC = async (req, res) => {
   try {
@@ -98,14 +112,24 @@ exports.verifyKYC = async (req, res) => {
     const ok = await bcrypt.compare(password, requester.password);
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
+        createCard1({
+      nfcId: `NFC${Date.now()}`,
+      ownerId: requester._id,
+      ownerType: requesterType,
+      cardType: "Regular",
+      expiryDate: null
+    })
+
     requester.isVerified = true;
     await requester.save();
+
 
     return res.status(200).json({
       message: `${requesterType} verified successfully`,
       requester
     });
 
+    
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -209,6 +233,16 @@ exports.createCard = async (req, res) => {
   try {
     const { nfcId, ownerId, ownerType, cardType } = req.body;
 
+    const existingRequest = await CardRequest.findOne({
+      requesterType: ownerType,
+      requesterId: ownerId,
+    });
+
+    if (!existingRequest ) {
+      return res.status(400).json({ message: "No completed card request found for this owner" });
+    }
+
+    
     if (!["User", "Org", "Ward"].includes(ownerType)) {
       return res.status(400).json({ message: "Invalid owner type" });
     }
@@ -217,18 +251,24 @@ exports.createCard = async (req, res) => {
       return res.status(400).json({ message: "Invalid card type" });
     }
 
-    const exists = await Card.findOne({ nfcId });
+    const exists = await Card.findOne({ ownerId });
     if (exists) return res.status(400).json({ message: "NFC already exists" });
 
     const card = await Card.create({
-      ...req.body,
+      nfcId,
+      ownerType,
+      ownerId,
+      cardType,
       status: "Active",
       expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined,
-      balance: req.body.balance || 0
+      balance: 0
     });
+
+    await CardRequest.findByIdAndDelete(existingRequest._id);
 
     return res.status(201).json({ message: "Card created successfully", card });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
+
