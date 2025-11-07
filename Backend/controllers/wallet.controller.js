@@ -83,6 +83,11 @@ exports.getWalletBalance = async (req, res) => {
     //   return res.status(403).json({ message: "Access denied" });
     // }
 
+
+    
+
+    
+
     return res.json({ wallet });
 
   } catch (error) {
