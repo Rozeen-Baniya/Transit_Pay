@@ -1,53 +1,68 @@
-import {
-    Image,
-  TextInput,
-  View,
-  TouchableOpacity,
-  Text,
-} from 'react-native';
-import React from 'react';
+import { Image, TextInput, View, TouchableOpacity, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native-gesture-handler';
 import { ChevronRight, Search, Wallet } from 'lucide-react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchWallet, loadToken } from '../../../Redux/Reducers/WalletSlice';
+import { fetchUser } from '../../../Redux/Reducers/userSlice';
 
-const data = [
-  {
-    id: 1,
-    type: 'Topup',
-    amount: '+NPR 500.00',
-    date: '2023-10-01',
-    remarks: 'Via Mobile Banking',
-  },
-  {
-    id: 2,
-    type: 'Bus Fare',
-    amount: '-NPR 50.00',
-    date: '2023-10-02',
-    remarks: 'From KMC to LMC, Sajha Yatayat BA62028',
-  },
-  {
-    id: 3,
-    type: 'Topup',
-    amount: '+NPR 300.00',
-    date: '2023-10-03',
-    remarks: 'Via Credit Card',
-  },
-];
+const WalletScreen = ({ navigation }) => {
+  const [transactions, setTransactions] = useState([]);
+  const {wallet, userId,} = useSelector(state => state.wallet);
+  const {user} = useSelector(state => state.user)
 
-const WalletScreen = ({navigation}) => {
+
+  const dispatch = useDispatch();
+
+  
+  useEffect(() => {
+    dispatch(loadToken())
+    dispatch(fetchWallet(userId));
+    dispatch(fetchUser(userId))
+  }, [userId]);
+
+      console.log('Fetching wallet:', wallet);
+      console.log('User:', user);
+
+  // Fallback sample data
+  const sampleTransactions = [
+    {
+      id: 1,
+      type: 'Topup',
+      amount: '+NPR 500.00',
+      date: '2023-10-01',
+      remarks: 'Via Mobile Banking',
+    },
+    {
+      id: 2,
+      type: 'Bus Fare',
+      amount: '-NPR 50.00',
+      date: '2023-10-02',
+      remarks: 'From KMC to LMC, Sajha Yatayat BA62028',
+    },
+    {
+      id: 3,
+      type: 'Topup',
+      amount: '+NPR 300.00',
+      date: '2023-10-03',
+      remarks: 'Via Credit Card',
+    },
+  ];
+
   return (
     <ScrollView className="flex-1 bg-white">
       <View className="w-screen pt-14 h-60 bg-blue-500 rounded-b-[15%] relative px-6 pt-10">
         <View className="w-full flex-row justify-between items-center">
           <View>
             <Text className="text-white text-2xl font-bold">
-              Hello, Prashant
+              Hello, {user ? (user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1)) : "Guest"}
             </Text>
             <Text className="text-white text-base mt-2">
               Welcome back to TransitPAY
             </Text>
           </View>
           <View className="w-12 h-12 bg-white rounded-full items-center justify-center shadow-lg">
-            <Text className="text-blue-500 text-lg font-bold">P</Text>
+            <Text className="text-blue-500 text-lg font-bold">{user ? (user.firstName.split("")[0].toUpperCase()) : "T"}</Text>
           </View>
         </View>
         <View className=" w-full mt-3">
@@ -69,12 +84,14 @@ const WalletScreen = ({navigation}) => {
           </TouchableOpacity>
         </View>
       </View>
+
       <View className="mt-12 bg-blue-500 mx-5  rounded-lg">
-        
         <View className=" p-4 flex-row justify-between ">
           <View className="">
             <Text className="text-xs text-gray-300 mt-1">Balance (NPR)</Text>
-            <Text className="text-2xl text-white font-semibold ">250.00</Text>
+            <Text className="text-2xl text-white font-semibold ">
+              {wallet?.balance?.toFixed(2) || '0.00'}
+            </Text>
           </View>
           <View className=" flex-row items-center h-10 self-center px-2 py-2 gap-2 bg-gray-500/50 border-white border rounded-lg">
             <Wallet size={20} color="gold" />
@@ -94,12 +111,13 @@ const WalletScreen = ({navigation}) => {
           </View>
         </View>
       </View>
+
       <View className=" mt-6">
         <View>
           <Text className="px-6 font-bold pb-2">Recent transactions</Text>
         </View>
         <View className="mx-5 border border-t rounded-lg border-gray-200">
-          {data.map(item => (
+          {(transactions.length ? transactions : sampleTransactions).map(item => (
             <View
               key={item.id}
               className="flex-row justify-between items-center px-5 py-4 border-b border-gray-200"
@@ -120,22 +138,19 @@ const WalletScreen = ({navigation}) => {
               </Text>
             </View>
           ))}
-          <TouchableOpacity onPress={()=> navigation.navigate("Transactions")}>
+          <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
             <Text className="text-center text-blue-500 py-4 font-semibold">
               See All Transactions
             </Text>
           </TouchableOpacity>
         </View>
-         <View>
-         
-        </View>
         <View className="flex-row px-5">
-            <Image
-              source={require('../../assets/test.jpg')}
-              className="w-full h-24 my-6"
-              resizeMode="cover"
-            />
-          </View>
+          <Image
+            source={require('../../assets/test.jpg')}
+            className="w-full h-24 my-6"
+            resizeMode="cover"
+          />
+        </View>
       </View>
     </ScrollView>
   );

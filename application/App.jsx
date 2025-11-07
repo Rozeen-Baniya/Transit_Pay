@@ -7,6 +7,8 @@ import NavigationHandler from './components/Root/NavigationHandler';
 import MainAppNavigation from './components/Root/MainAppNavigation';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Provider } from 'react-redux';
+import store from './Redux/store';
 
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,9 +42,11 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Provider store={store}>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Provider>
   );
 };
 
