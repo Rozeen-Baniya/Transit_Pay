@@ -139,7 +139,22 @@ FIREBASE_CONFIG=...
 ```
 
 ---
+## 📋 API Endpoints
 
+### Wallet Endpoints
+
+- **Create Wallet:** `POST /api/wallet/create`
+- **Get Wallet Balance:** `GET /api/wallet/:walletId`
+- **Get Transaction History:** `GET /api/wallet/:walletId/transactions`
+- **Deduct Fare:** `POST /api/wallet/:walletId/deduct`
+- **Initiate Top-up:** `POST /api/wallet/:walletId/topup`
+- **Confirm Top-up:** `POST /api/wallet/:walletId/topup/confirm`
+- **Pre-authorize Funds:** `POST /api/wallet/:walletId/preauth`
+- **Capture Pre-authorization:** `POST /api/wallet/:walletId/preauth/:txId/capture`
+- **Release Pre-authorization:** `POST /api/wallet/:walletId/preauth/:txId/release`
+- **Get Transaction Receipt:** `GET /api/wallet/:walletId/receipt/:txId`
+
+---
 ## 🚀 Deployment
 
 | Layer         | Platform      |

@@ -1,0 +1,15 @@
+[
+  {
+    "code": "R1",
+    "name": "Central - University",
+    "description": "Main corridor route",
+    "stops": ["ST01","ST02","ST03"],
+    "path": {
+      "coordinates": [
+        [85.3240, 27.7172],
+        [85.3270, 27.7179],
+        [85.3310, 27.7185]
+      ]
+    }
+  }
+]
