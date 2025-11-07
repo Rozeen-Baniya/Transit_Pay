@@ -115,16 +115,16 @@ exports.nfcAuthenticate = async (req, res) => {
 
 exports.nfcTapIn = async (req, res) => {
   try {
-    const { nfcId, busId, routeId, currentCoordinates, userId } = req.body; // userId to be authenticated via NFC
+    const { nfcId, busId, routeId, currentCoordinates, userId, walletId } = req.body; // Add walletId
 
     // 1. Authenticate user via NFC (mocked for now, assumes userId is provided after successful auth)
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({ success: false, message: 'User not authenticated or invalid userId' });
     }
 
-    // 2. Call boardBus logic from tripController
-    req.body = { busId, routeId, userId, currentCoordinates }; // Re-package body for tripController
-    await tripController.boardBus(req, res); // Pass req and res to boardBus
+    // 2. Call handleTripStatus logic from tripController
+    req.body = { busId, routeId, userId, currentCoordinates, walletId }; // Re-package body for tripController
+    await tripController.handleTripStatus(req, res); // Call the unified function
 
   } catch (error) {
     console.error('NFC Tap-In Error:', error);
@@ -141,9 +141,9 @@ exports.nfcTapOut = async (req, res) => {
       return res.status(401).json({ success: false, message: 'User not authenticated or invalid userId' });
     }
 
-    // 2. Call exitBus logic from tripController
+    // 2. Call handleTripStatus logic from tripController
     req.body = { busId, routeId, userId, currentCoordinates, walletId }; // Re-package body for tripController
-    await tripController.exitBus(req, res); // Pass req and res to exitBus
+    await tripController.handleTripStatus(req, res); // Call the unified function
 
   } catch (error) {
     console.error('NFC Tap-Out Error:', error);
