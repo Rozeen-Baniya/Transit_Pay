@@ -2,9 +2,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { create } from 'react-test-renderer';
 
 // Helper: Decode base64url JWT payload safely
-const decodeJwtPayload = (payload) => {
+const decodeJwtPayload = payload => {
   try {
     let base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
@@ -12,7 +13,7 @@ const decodeJwtPayload = (payload) => {
       atob(base64)
         .split('')
         .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+        .join(''),
     );
     return JSON.parse(decodedStr);
   } catch (err) {
@@ -32,7 +33,8 @@ export const loadToken = createAsyncThunk(
       if (parts.length !== 3) return thunkAPI.rejectWithValue('Invalid token');
 
       const decoded = decodeJwtPayload(parts[1]);
-      if (!decoded?.id) return thunkAPI.rejectWithValue('Invalid token payload');
+      if (!decoded?.id)
+        return thunkAPI.rejectWithValue('Invalid token payload');
 
       return { token: storedToken, userId: decoded.id };
     } catch (err) {
@@ -53,7 +55,23 @@ export const fetchWallet = createAsyncThunk(
       return response.data.wallet;
     } catch (err) {
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || err.message
+        err.response?.data?.message || err.message,
+      );
+    }
+  },
+);
+
+export const getCards = createAsyncThunk(
+  'wallet/getCards',
+  async (userId, thunkAPI) => {
+    try {
+      const response = await axios.get(
+        `https://codarambha-git-force-transit-pay-ba.vercel.app/api/card-requests/${userId}`,
+      );
+      return response.data;
+    } catch (err) {
+      return thunkAPI.rejectWithValue(
+        err.response?.data?.message || err.message,
       );
     }
   },
@@ -62,17 +80,24 @@ export const fetchWallet = createAsyncThunk(
 const walletSlice = createSlice({
   name: 'wallet',
   initialState: {
-    wallet: null,    
+    wallet: null,
     token: null,
     userId: null,
     loading: false,
     error: null,
+    cards: [
+      {
+        card: null,
+        name: '...',
+        lastName: '...',
+      },
+    ],
   },
   reducers: {},
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
       // Load token
-      .addCase(loadToken.pending, (state) => {
+      .addCase(loadToken.pending, state => {
         state.loading = true;
         state.error = null;
       })
@@ -86,15 +111,27 @@ const walletSlice = createSlice({
         state.error = action.payload;
       })
       // Fetch wallet
-      .addCase(fetchWallet.pending, (state) => {
+      .addCase(fetchWallet.pending, state => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchWallet.fulfilled, (state, action) => {
         state.loading = false;
-        state.wallet = action.payload; 
+        state.wallet = action.payload;
       })
       .addCase(fetchWallet.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(getCards.pending, state => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getCards.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cards = action.payload;
+      })
+      .addCase(getCards.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

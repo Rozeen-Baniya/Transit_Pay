@@ -1,60 +1,32 @@
-import { View, Text, TouchableOpacity, Pressable } from 'react-native'
-import React from 'react'
+import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import React, { useEffect } from 'react';
 import { ScrollView } from 'react-native-gesture-handler';
 import { ArrowLeft } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchTransactions } from '../../../Redux/Reducers/transactionSlice';
 
 const TransactionScreen = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation();
 
-    const data = [
-  {
-    id: 1,
-    type: 'Topup',
-    amount: '+NPR 500.00',
-    date: '2023-10-01',
-    remarks: 'Via Mobile Banking',
-  },
-  {
-    id: 2,
-    type: 'Bus Fare',
-    amount: '-NPR 50.00',
-    date: '2023-10-02',
-    remarks: 'KMC-LMC, Sajha Yatayat BA62028',
-  },
-  {
-    id: 3,
-    type: 'Topup',
-    amount: '+NPR 300.00',
-    date: '2023-10-03',
-    remarks: 'Via Credit Card',
-  },
-  {
-    id: 4,
-    type: 'BUs Fare',
-    amount: '-NPR 120.00',
-    date: '2023-10-04',
-    remarks: 'BANEPA-KTM, Mahanagar Yatayat BA62028',
-  },
-  {
-    id: 5,
-    type: 'Topup',
-    amount: '+NPR 400.00',
-    date: '2023-10-05',
-    remarks: 'Via E-sewa',
-  },
-  {
-    id: 6,
-    type: 'Bus Fare',
-    amount: '-NPR 25.00',
-    date: '2023-10-06',
-    remarks: 'BAGBAZAR-SORAKHUTTE, Nepal Yatayat BA62028',
-  }
-];
+  const dispatch = useDispatch();
+  const { userId } = useSelector(state => state.wallet);
+  const { transactions } = useSelector(state => state.transaction);
+
+  useEffect(() => {
+    dispatch(fetchTransactions(userId));
+  }, [userId]);
+
+  console.log('transactions', transactions);
+
+  const data = transactions;
   return (
-     <ScrollView className="flex-1 bg-white">
+    <ScrollView className="flex-1 bg-white">
       <View>
-        <Pressable onPress={()=> navigation.goBack()} className="flex-row pt-4 pl-5 bg-blue-500 items-center">
+        <Pressable
+          onPress={() => navigation.goBack()}
+          className="flex-row pt-4 pl-5 bg-blue-500 items-center"
+        >
           <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
         <View className="w-screen  h-28 bg-blue-500 rounded-b-[15%] relative px-6 pt-6">
@@ -75,19 +47,21 @@ const TransactionScreen = () => {
           </View>
         </View>
       </View>
-        <View className="w-screen mt-6">
+      <View className="w-screen mt-6">
         <View>
           <Text className="px-6 font-bold pb-2">Recent transactions</Text>
         </View>
         <View className="mx-5 border border-t rounded-lg border-gray-200">
           {data.map(item => (
             <View
-              key={item.id}
+              key={item._id}
               className="flex-row justify-between items-center px-5 py-4 border-b border-gray-200"
             >
               <View>
                 <Text className="text-sm font-semibold">{item.type}</Text>
-                <Text className="text-xs text-gray-500">{item.date}</Text>
+                <Text className="text-xs text-gray-500">
+                  {new Date(item.createdAt).toLocaleString()}
+                </Text>
                 <Text className="text-xs text-gray-500">{item.remarks}</Text>
               </View>
               <Text
@@ -102,12 +76,10 @@ const TransactionScreen = () => {
             </View>
           ))}
         </View>
-         <View>
-         
-        </View>
+        <View></View>
       </View>
     </ScrollView>
-  )
-}
+  );
+};
 
-export default TransactionScreen
+export default TransactionScreen;
