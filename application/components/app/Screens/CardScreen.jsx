@@ -16,7 +16,7 @@ const CardScreen = () => {
   console.log(cards);
   
 
-  if (loading) {
+  if (loading && !cards) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <Text>Loading cards...</Text>
@@ -84,7 +84,7 @@ const CardScreen = () => {
               />
               <View className="absolute bottom-3 right-6 items-end">
                 <Text className="text-yellow-300/70 text-xl font-bold">
-                  {item.card.cardType.toUpperCase()}
+                  {item?.card?.cardType?.toUpperCase()}
                 </Text>
                 <Text className="text-white text-sm">
                   {item.name} {item.lastName}

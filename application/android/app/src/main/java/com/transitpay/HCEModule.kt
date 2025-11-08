@@ -20,6 +20,6 @@ class HCEModule(reactContext: ReactApplicationContext) :
         intent.putExtra("ndefMessage", payload)
         context.startService(intent)
 
-        Toast.makeText(context, "NDEF message set: $payload", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Ready for NFC", Toast.LENGTH_SHORT).show()
     }
 }

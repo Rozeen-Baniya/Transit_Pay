@@ -1,53 +1,51 @@
-import { Image, TextInput, View, TouchableOpacity, Text } from 'react-native';
+import {
+  Image,
+  TextInput,
+  View,
+  TouchableOpacity,
+  Text,
+  NativeModules,
+} from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native-gesture-handler';
 import { ChevronRight, Search, Wallet } from 'lucide-react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchWallet, loadToken } from '../../../Redux/Reducers/WalletSlice';
 import { fetchUser } from '../../../Redux/Reducers/userSlice';
+import { fetchTransactions } from '../../../Redux/Reducers/transactionSlice';
 
 const WalletScreen = ({ navigation }) => {
-  const [transactions, setTransactions] = useState([]);
-  const {wallet, userId,} = useSelector(state => state.wallet);
-  const {user} = useSelector(state => state.user)
-
+  const { wallet, userId, token } = useSelector(state => state.wallet);
+  const { user } = useSelector(state => state.user);
+  const { HCEModule } = NativeModules;
+  const [payload, setPayload] = useState(null);
 
   const dispatch = useDispatch();
 
-  
   useEffect(() => {
-    dispatch(loadToken())
+    dispatch(loadToken());
     dispatch(fetchWallet(userId));
-    dispatch(fetchUser(userId))
+    dispatch(fetchUser(userId));
+
+    setPayload(token);
   }, [userId]);
 
-      console.log('Fetching wallet:', wallet);
-      console.log('User:', user);
+  console.log('Fetching wallet:', wallet);
+  console.log('token:', token);
 
-  // Fallback sample data
-  const sampleTransactions = [
-    {
-      id: 1,
-      type: 'Topup',
-      amount: '+NPR 500.00',
-      date: '2023-10-01',
-      remarks: 'Via Mobile Banking',
-    },
-    {
-      id: 2,
-      type: 'Bus Fare',
-      amount: '-NPR 50.00',
-      date: '2023-10-02',
-      remarks: 'From KMC to LMC, Sajha Yatayat BA62028',
-    },
-    {
-      id: 3,
-      type: 'Topup',
-      amount: '+NPR 300.00',
-      date: '2023-10-03',
-      remarks: 'Via Credit Card',
-    },
-  ];
+  useEffect(() => {
+    if (payload !== null) {
+      HCEModule.sendPayload(payload);
+    }
+  }, [payload]);
+
+  const { transactions } = useSelector(state => state.transaction);
+
+  useEffect(() => {
+    dispatch(fetchTransactions(userId));
+  }, [userId]);
+
+  console.log('transactions', transactions);
 
   return (
     <ScrollView className="flex-1 bg-white">
@@ -55,14 +53,20 @@ const WalletScreen = ({ navigation }) => {
         <View className="w-full flex-row justify-between items-center">
           <View>
             <Text className="text-white text-2xl font-bold">
-              Hello, {user ? (user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1)) : "Guest"}
+              Hello,{' '}
+              {user
+                ? user.firstName.charAt(0).toUpperCase() +
+                  user.firstName.slice(1)
+                : 'Guest'}
             </Text>
             <Text className="text-white text-base mt-2">
               Welcome back to TransitPAY
             </Text>
           </View>
           <View className="w-12 h-12 bg-white rounded-full items-center justify-center shadow-lg">
-            <Text className="text-blue-500 text-lg font-bold">{user ? (user.firstName.split("")[0].toUpperCase()) : "T"}</Text>
+            <Text className="text-blue-500 text-lg font-bold">
+              {user ? user.firstName.split('')[0].toUpperCase() : 'T'}
+            </Text>
           </View>
         </View>
         <View className=" w-full mt-3">
@@ -117,14 +121,19 @@ const WalletScreen = ({ navigation }) => {
           <Text className="px-6 font-bold pb-2">Recent transactions</Text>
         </View>
         <View className="mx-5 border border-t rounded-lg border-gray-200">
-          {(transactions.length ? transactions : sampleTransactions).map(item => (
+          {(transactions.length > 3
+            ? transactions.slice(0, 3)
+            : transactions
+          ).map(item => (
             <View
               key={item.id}
               className="flex-row justify-between items-center px-5 py-4 border-b border-gray-200"
             >
               <View>
                 <Text className="text-sm font-semibold">{item.type}</Text>
-                <Text className="text-xs text-gray-500">{item.date}</Text>
+                <Text className="text-xs text-gray-500">
+                  {new Date(item.createdAt).toLocaleString()}
+                </Text>{' '}
                 <Text className="text-xs text-gray-500">{item.remarks}</Text>
               </View>
               <Text
