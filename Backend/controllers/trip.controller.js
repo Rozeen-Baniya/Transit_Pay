@@ -7,12 +7,8 @@ const { createTransaction2 } = require('./transactions.controller');
 
 exports.handleTripStatus = async (req, res) => {
   try {
-    const { transportId, token } = req.body;
+    const { transportId, userId } = req.body;
     const fare = 50;
-
-    // ✅ Verify & decode JWT to extract user ID
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
 
     // ✅ Ensure wallet exists
     const wallet = await Wallet.findOne({ userId });
