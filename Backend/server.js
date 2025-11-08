@@ -55,6 +55,7 @@ app.use("/api/wallets", require("./routes/wallet.routes"));
 app.use("/api/rbac/roles", require("./routes/role.routes"));
 app.use("/api/nfc", require("./routes/nfc.routes"));
 app.use("/api/rbac/permissions", require("./routes/permission.routes"));
+app.use("/api/transactions", require("./routes/transactions.routes"));
 
 app.use((err, req, res, next) => {
   console.error(err);

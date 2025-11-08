@@ -577,3 +577,28 @@ exports.getReceipt = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+
+
+exports.addMoney = async (amount, walletId) => {
+  try {
+    const { amount, walletId } = req.body;
+
+    if (!type || !amount || !walletId || !remarks) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const wallet = await Wallet.findById(walletId);
+    if (!wallet) {
+      return res.status(404).json({ message: 'Wallet not found' });
+    }
+
+    wallet.balance += amount;
+    await wallet.save();
+
+    res.status(201).json({ message: 'Money added successfully', });
+  } catch (error) {
+    console.error('Error adding money:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
