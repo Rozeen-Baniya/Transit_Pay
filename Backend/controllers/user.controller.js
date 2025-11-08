@@ -136,8 +136,7 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET || 'dev_secret',
-      { expiresIn: process.env.ACCESS_TOKEN_EXPIRES || "30d" }
+      process.env.JWT_SECRET,
     );
 
     // Create refresh token (rotating)
