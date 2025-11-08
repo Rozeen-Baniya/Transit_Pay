@@ -1,126 +1,146 @@
-const BusTrip = require('../models/bustrip.model');
-const Route = require('../models/route.model');
 const Transport = require('../models/transport.model');
-const geoService = require('../services/geo.service');
-const walletController = require('./wallet.controller');
-const fareService = require('../services/fare.service');
-// const Stop = require('../models/stop.model'); // No longer needed as fare is hardcoded
+const Trip = require('../models/trip.model');
+const Wallet = require('../models/wallet.model');
+const jwt = require('jsonwebtoken');
+const { deductMoney } = require('./wallet.controller');
+const { createTransaction2 } = require('./transactions.controller');
 
 exports.handleTripStatus = async (req, res) => {
   try {
-    const { busId, routeId, userId, currentCoordinates, walletId } = req.body;
+    const { transportId, token } = req.body;
+    const fare = 50;
 
-    // 1. Validate bus and route
-    const bus = await Transport.findById(busId);
-    if (!bus) return res.status(404).json({ message: 'Bus not found' });
+    // ✅ Verify & decode JWT to extract user ID
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
 
-    const route = await Route.findById(routeId).populate('stops.stop');
-    if (!route) return res.status(404).json({ message: 'Route not found' });
-
-    // 2. Geolocation Matching: Check if bus is on the correct route
-    if (!geoService.isOnRoute(route, currentCoordinates)) {
-      return res.status(400).json({ message: 'Bus is not on the assigned route' });
+    // ✅ Ensure wallet exists
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      return res.status(404).json({
+        message: 'Wallet not found. Please ask user for KYC verification.'
+      });
     }
 
-    // 3. Find nearest stop on the route
-    const nearestStop = await geoService.nearestStopOnRoute(route, currentCoordinates);
-    if (!nearestStop || nearestStop.distanceMeters > 50) { // Within 50 meters of a stop
-      return res.status(400).json({ message: 'Bus is not at a valid stop on this route' });
+    // ✅ Validate transport
+    const bus = await Transport.findById(transportId);
+    if (!bus) {
+      return res.status(404).json({ message: 'Bus not found' });
     }
-    const currentStop = nearestStop.stop;
 
-    // 4. Check for an active trip for the user on this bus/route
-    let busTrip = await BusTrip.findOne({
-      busId,
-      routeId,
-      'passengers.userId': userId,
-      'passengers.exitTime': { $exists: false } // Passenger has not exited yet
+    // ✅ Check if there's an ACTIVE trip (Tap-Out)
+    let activeTrip = await Trip.findOne({
+      transportId,
+      passengerId: userId,
+      isCompleted: false
     });
 
-    if (busTrip) {
-      // User has an active trip (Tap-Out scenario)
-      const passengerIndex = busTrip.passengers.findIndex(
-        p => p.userId.toString() === userId && !p.exitTime
-      );
-      const passenger = busTrip.passengers[passengerIndex];
-
-      // Update passenger exit details
-      passenger.exitStopId = currentStop._id;
-      passenger.exitTime = new Date();
-
-      // Calculate fare (hardcoded)
-      const fare = 50; // Hardcoded fare as per new requirement
-      passenger.provisionalFare = fare;
-
-      // Deduct fare using wallet controller (uncomment for actual deduction)
-      const mockReq = {
-        userId: userId,
-        params: { walletId: walletId },
-        body: {
-          amount: fare,
-          currency: 'NPR',
-          idempotencyKey: `${busTrip._id}-${userId}-${Date.now()}`,
-          fareDetails: {
-            boardStop: boardStop.name,
-            exitStop: currentStop.name,
-            route: route.name,
-            calculatedFare: fare
-          },
-          location: { coordinates: currentCoordinates }
-        }
-      };
-      const mockRes = {
-        status: (statusCode) => ({
-          json: (data) => {
-            if (statusCode !== 200) console.error('Fare deduction failed:', data);
+    if (activeTrip) {
+      // ✅ TAP-OUT — complete existing trip
+      const updatedTrip = await Trip.findOneAndUpdate(
+        { _id: activeTrip._id },
+        {
+          $set: {
+            isCompleted: true,
+            destinationStation: "Budanilkantha",
+            fare
           }
-        })
-      };
-      // await walletController.deductFare(mockReq, mockRes);
+        },
+        { new: true }
+      );
 
-      await busTrip.save();
+      const walletId = wallet._id;
 
-      res.status(200).json({
-        message: 'User exited successfully',
-        busTripId: busTrip._id,
-        exitStop: currentStop.name,
-        fare: fare,
-        currentLocation: busTrip.currentLocation
+      await deductMoney({ amount:fare, walletId });
+
+      await createTransaction2({
+        type: "Bus Fare",
+        amount: fare,
+        walletId,
+        remarks: `From ${updatedTrip.startingStation} to ${updatedTrip.destinationStation}`
       });
 
-    } else {
-      // User does not have an active trip (Tap-In scenario)
-      let activeBusTrip = await BusTrip.findOne({ busId, routeId, status: 'in_progress' });
-
-      if (!activeBusTrip) {
-        activeBusTrip = new BusTrip({
-          busId,
-          routeId,
-          currentLocation: { coordinates: currentCoordinates },
-          status: 'in_progress',
-          passengers: []
-        });
-      }
-
-      // Record passenger boarding
-      activeBusTrip.passengers.push({
-        userId,
-        boardStopId: currentStop._id,
-        boardTime: new Date()
-      });
-
-      await activeBusTrip.save();
-
-      res.status(200).json({
-        message: 'User boarded successfully',
-        busTripId: activeBusTrip._id,
-        boardStop: currentStop.name,
-        currentLocation: activeBusTrip.currentLocation
+      return res.status(200).json({
+        message: "Trip completed successfully!",
+        trip: updatedTrip
       });
     }
 
+    // ✅ TAP-IN — create new active trip
+    const newTrip = new Trip({
+      transportId,
+      startingStation: "Maitidevi",
+      fare: 0,
+      destinationStation: "TBD",
+      passengerType: "User",
+      passengerId: userId,
+      isCompleted: false
+    });
+
+    await newTrip.save();
+
+    return res.status(200).json({
+      message: "User boarded successfully!",
+      trip: newTrip,
+      bus
+    });
+
   } catch (error) {
-    console.error('Handle trip status error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Trip Status Error:", error);
+    return res.status(500).json({
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
+
+
+exports.getTrips = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Fetch all trips for this user
+    const trips = await Trip.find({ passengerId: userId })
+      .populate({ path: 'transportId', model: Transport })
+      .sort({ createdAt: -1 });
+
+    // Format trips
+    const formattedTrips = trips.map(trip => ({
+      from: trip.startingStation || 'TBD',
+      to: trip.destinationStation || 'TBD',
+      date: trip.createdAt ? trip.createdAt.toISOString().split('T')[0] : 'TBD',
+      bus: trip.transportId
+        ? `${trip.transportId.transportCompany} ${trip.transportId.vehicleNumber}`
+        : 'Unknown Bus',
+      status: trip.isCompleted ? 'Completed' : 'Active',
+      fare: `NPR ${trip.fare.toFixed(2)}`,
+      startTime: trip.createdAt
+        ? trip.createdAt.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })
+        : 'TBD',
+      endTime:
+        trip.updatedAt && trip.isCompleted
+          ? trip.updatedAt.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            })
+          : 'TBD'
+    }));
+
+    return res.status(200).json({ trips: formattedTrips });
+  } catch (error) {
+    console.error('Get Trips Error:', error);
+    return res.status(500).json({
+      message: 'Server error',
+      error: error.message
+    });
   }
 };

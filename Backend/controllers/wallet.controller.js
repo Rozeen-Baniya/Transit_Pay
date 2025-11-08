@@ -602,3 +602,29 @@ exports.addMoney = async (amount, walletId) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+
+exports.deductMoney = async ({ amount, walletId }) => {
+  try {
+    console.log(amount)
+    const wallet = await Wallet.findById(walletId);
+
+    if (!wallet) {
+      throw new Error("Wallet not found");
+    }
+
+    if (wallet.balance < amount) {
+      throw new Error("Insufficient balance");
+    }
+    console.log(wallet)
+
+
+    wallet.balance -= amount;
+    await wallet.save();
+
+    return wallet; // ✅ Optionally return updated wallet
+  } catch (error) {
+    console.error("Error deducting money:", error);
+    throw error; // ✅ Throw so controller catches it
+  }
+};

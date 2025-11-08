@@ -31,7 +31,7 @@ exports.createTransaction = async (req, res) => {
   }
 };
 
-exports.createTransaction2 = async (type, amount, walletId, remarks) =>{
+exports.createTransaction2 = async ({type, amount, walletId, remarks}) =>{
     try {
         const transaction = new Transaction({
             type,
