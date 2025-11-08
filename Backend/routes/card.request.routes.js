@@ -12,7 +12,7 @@ router.post('/:cardId/unblock', cardRequestController.unblockCard);
 router.post('/verify', cardRequestController.verifyKYC);
 
 // Card type management and creation
-router.get('/:cardId', cardRequestController.getCardById);
+router.get('/:userId', cardRequestController.getCardById);
 router.put('/:cardId/type', cardRequestController.updateCardType);
 router.post('/create-card', cardRequestController.createCard);
 

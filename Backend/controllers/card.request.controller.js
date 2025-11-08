@@ -35,7 +35,8 @@ async function findRequester(type, username, fullName, dateOfBirth) {
 // ✅ Create Card Request
 exports.createCardRequest = async (req, res) => {
   try {
-    const { requesterType, username, password, fullName, dateOfBirth } = req.body;
+    const { requesterType, username, password, fullName, dateOfBirth } =
+      req.body;
 
     if (!requesterType || !username || !password) {
       return res.status(400).json({ message: "Missing fields" });
@@ -45,7 +46,12 @@ exports.createCardRequest = async (req, res) => {
       return res.status(400).json({ message: "Invalid requester type" });
     }
 
-    const requester = await findRequester(requesterType, username, fullName, dateOfBirth);
+    const requester = await findRequester(
+      requesterType,
+      username,
+      fullName,
+      dateOfBirth
+    );
 
     if (!requester) {
       return res.status(404).json({ message: `${requesterType} not found` });
@@ -55,34 +61,42 @@ exports.createCardRequest = async (req, res) => {
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
     if (!requester.isVerified) {
-      return res.status(403).json({ message: "Your KYC is still under verification." });
+      return res
+        .status(403)
+        .json({ message: "Your KYC is still under verification." });
     }
 
     const existingRequest = await CardRequest.findOne({
       requesterType,
       requesterId: requester._id,
-      status: "Pending"
+      status: "Pending",
     });
 
     if (existingRequest) {
-      return res.status(400).json({ message: "Pending request already exists" });
+      return res
+        .status(400)
+        .json({ message: "Pending request already exists" });
     }
 
     const newRequest = await CardRequest.create({
       requesterType,
       requesterId: requester._id,
-      status: "Pending"
+      status: "Pending",
     });
 
     return res.status(201).json(newRequest);
-
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
 
-
-const createCard1 = async ({nfcId, ownerId, ownerType, cardType, expiryDate}) => {
+const createCard1 = async ({
+  nfcId,
+  ownerId,
+  ownerType,
+  cardType,
+  expiryDate,
+}) => {
   return await Card.create({
     nfcId,
     ownerType,
@@ -90,21 +104,26 @@ const createCard1 = async ({nfcId, ownerId, ownerType, cardType, expiryDate}) =>
     cardType,
     status: "Active",
     expiryDate: expiryDate ? new Date(expiryDate) : undefined,
-    balance: 0
+    balance: 0,
   });
-}
-
+};
 
 // ✅ Verify KYC
 exports.verifyKYC = async (req, res) => {
   try {
-    const { requesterType, username, password, fullName, dateOfBirth } = req.body;
+    const { requesterType, username, password, fullName, dateOfBirth } =
+      req.body;
 
     if (!["User", "Org", "Ward"].includes(requesterType)) {
       return res.status(400).json({ message: "Invalid requester type" });
     }
 
-    const requester = await findRequester(requesterType, username, fullName, dateOfBirth);
+    const requester = await findRequester(
+      requesterType,
+      username,
+      fullName,
+      dateOfBirth
+    );
     if (!requester) {
       return res.status(404).json({ message: `${requesterType} not found` });
     }
@@ -112,24 +131,21 @@ exports.verifyKYC = async (req, res) => {
     const ok = await bcrypt.compare(password, requester.password);
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-        createCard1({
+    createCard1({
       nfcId: `NFC${Date.now()}`,
       ownerId: requester._id,
       ownerType: requesterType,
       cardType: "Regular",
-      expiryDate: null
-    })
+      expiryDate: null,
+    });
 
     requester.isVerified = true;
     await requester.save();
 
-
     return res.status(200).json({
       message: `${requesterType} verified successfully`,
-      requester
+      requester,
     });
-
-    
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -152,7 +168,7 @@ exports.blockCard = async (req, res) => {
       requesterId: req.userId,
       cardId: card._id,
       status: "Completed",
-      meta: { action: "Blocked" }
+      meta: { action: "Blocked" },
     });
 
     return res.status(200).json({ message: "Card blocked successfully", card });
@@ -178,23 +194,53 @@ exports.unblockCard = async (req, res) => {
       requesterId: req.userId,
       cardId: card._id,
       status: "Completed",
-      meta: { action: "Unblocked" }
+      meta: { action: "Unblocked" },
     });
 
-    return res.status(200).json({ message: "Card unblocked successfully", card });
-
+    return res
+      .status(200)
+      .json({ message: "Card unblocked successfully", card });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
 
-// ✅ Get Card by ID
+// ✅ Get Card by Owner ID
 exports.getCardById = async (req, res) => {
   try {
-    const card = await Card.findById(req.params.cardId);
-    if (!card) return res.status(404).json({ message: "Card not found" });
+    const { userId } = req.params;
 
-    return res.status(200).json({ card });
+    const card = await Card.findOne({ ownerId: userId });
+
+    if (!card) {
+      return res.status(404).json({ message: "Card not found" });
+    }
+
+    const ownerModelMap = {
+      User,
+      Org,
+      Ward,
+    };
+
+    const OwnerModel = ownerModelMap[card.ownerType];
+
+    if (!OwnerModel) {
+      return res
+        .status(500)
+        .json({ message: "Invalid owner type in card data" });
+    }
+
+    const owner = await OwnerModel.findById(card.ownerId);
+
+    return res.status(200).json({
+      card,
+      name: owner.firstName
+        ? owner.firstName.charAt(0).toUpperCase() + owner.firstName.slice(1)
+        : "",
+      lastName: owner.lastName
+        ? owner.lastName.charAt(0).toUpperCase() + owner.lastName.slice(1)
+        : "",
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -219,7 +265,7 @@ exports.updateCardType = async (req, res) => {
       requesterId: req.userId,
       cardId: card._id,
       status: "Completed",
-      meta: { action: "Card type change" }
+      meta: { action: "Card type change" },
     });
 
     return res.status(200).json({ message: "Card type updated", card });
@@ -238,11 +284,12 @@ exports.createCard = async (req, res) => {
       requesterId: ownerId,
     });
 
-    if (!existingRequest ) {
-      return res.status(400).json({ message: "No completed card request found for this owner" });
+    if (!existingRequest) {
+      return res
+        .status(400)
+        .json({ message: "No completed card request found for this owner" });
     }
 
-    
     if (!["User", "Org", "Ward"].includes(ownerType)) {
       return res.status(400).json({ message: "Invalid owner type" });
     }
@@ -260,8 +307,10 @@ exports.createCard = async (req, res) => {
       ownerId,
       cardType,
       status: "Active",
-      expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined,
-      balance: 0
+      expiryDate: req.body.expiryDate
+        ? new Date(req.body.expiryDate)
+        : undefined,
+      balance: 0,
     });
 
     await CardRequest.findByIdAndDelete(existingRequest._id);
@@ -271,4 +320,3 @@ exports.createCard = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
-
