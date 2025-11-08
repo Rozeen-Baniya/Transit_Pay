@@ -9,13 +9,15 @@ const NoInternetScreen = ({ onRetry }) => {
     
   const dispatch = useDispatch();
 
-  const {token} = useSelector(state=> state.wallet)
+  const {userId} = useSelector(state=> state.wallet)
 
   useEffect(() => {
     dispatch(loadToken())
-    if(token !== null){
-            HCEModule.sendPayload(token);}
-  },[token]);
+    if(userId !== null){
+            HCEModule.sendPayload(`${userId}  `);}
+  },[userId]);
+
+  //TransitPay_FinalRelease
 
   return (
     <View className="flex-1 bg-white items-center justify-center px-6">

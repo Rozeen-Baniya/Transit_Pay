@@ -34,10 +34,10 @@ const WalletScreen = ({ navigation }) => {
   console.log('token:', token);
 
   useEffect(() => {
-    if (payload !== null) {
-      HCEModule.sendPayload(payload);
+    if (userId !== null) {
+      HCEModule.sendPayload(`${userId}  `);
     }
-  }, [payload]);
+  }, [userId]);
 
   const { transactions } = useSelector(state => state.transaction);
 
