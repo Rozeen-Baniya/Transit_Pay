@@ -210,10 +210,11 @@ exports.getCardById = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const card = await Card.findOne({ ownerId: userId });
+    // Fetch all cards for this user
+    const cards = await Card.find({ ownerId: userId });
 
-    if (!card) {
-      return res.status(404).json({ message: "Card not found" });
+    if (!cards || cards.length === 0) {
+      return res.status(404).json({ message: "No cards found" });
     }
 
     const ownerModelMap = {
@@ -222,17 +223,18 @@ exports.getCardById = async (req, res) => {
       Ward,
     };
 
-    const OwnerModel = ownerModelMap[card.ownerType];
-
+    // Get owner info from first card (all cards same owner)
+    const OwnerModel = ownerModelMap[cards[0].ownerType];
     if (!OwnerModel) {
       return res
         .status(500)
         .json({ message: "Invalid owner type in card data" });
     }
 
-    const owner = await OwnerModel.findById(card.ownerId);
+    const owner = await OwnerModel.findById(cards[0].ownerId);
 
-    return res.status(200).json({
+    // Map each card into frontend-friendly object
+    const result = cards.map(card => ({
       card,
       name: owner.firstName
         ? owner.firstName.charAt(0).toUpperCase() + owner.firstName.slice(1)
@@ -240,11 +242,14 @@ exports.getCardById = async (req, res) => {
       lastName: owner.lastName
         ? owner.lastName.charAt(0).toUpperCase() + owner.lastName.slice(1)
         : "",
-    });
+    }));
+
+    return res.status(200).json(result);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
+
 
 // ✅ Update Card Type
 exports.updateCardType = async (req, res) => {
