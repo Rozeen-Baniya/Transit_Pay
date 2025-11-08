@@ -20,67 +20,50 @@ const char* apiHost = "https://codarambha-git-force-transit-pay-ba.vercel.app";
 
 Adafruit_PN532 nfc(PN532_SS);
 
-const int MAX_REDIRECTS = 5;
-
-// Function to send GET request with redirect handling
-void sendPayload(String payload) {
+void sendPayload(String userId) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Skipping API request.");
     return;
   }
 
   WiFiClientSecure client;
-  client.setInsecure(); // Skip SSL verification (for testing)
+  client.setInsecure();  // Skip SSL verification
 
   HTTPClient http;
-  String url = apiHost; // initial URL
-  int redirectCount = 0;
+  String url = String(apiHost) + "/api/trips";
 
-  while (redirectCount < MAX_REDIRECTS) {
-    Serial.println("Sending GET request to: " + url);
-    http.begin(client, url);
-    int httpResponseCode = http.GET();
+  // Prepare JSON body
+  String postData = "{\"transportId\":\"690f8186f2244f32447f8fd2\",\"userId\":\"" + userId + "\"}";
 
-    if (httpResponseCode > 0) {
-      Serial.print("HTTP Response code: ");
-      Serial.println(httpResponseCode);
+  Serial.println("Sending POST request to: " + url);
+  Serial.println("Payload: " + postData);
 
-      if (httpResponseCode == 200) {
-        String response = http.getString();
-        Serial.println("Server Response: " + response);
-        tone(BUZZER_PIN, 2500, 700); // success beep
-        break; // done
-      }
-      else if (httpResponseCode == 308 || httpResponseCode == 301 || httpResponseCode == 302) {
-        // Handle redirect
-        url = http.getLocation();
-        Serial.println("Redirected to: " + url);
-        redirectCount++;
-        http.end(); // end current connection before retrying
-        delay(100);
-        continue;
-      } else {
-        Serial.println("Error response from server.");
-        tone(BUZZER_PIN, 500, 1000); // failure beep
-        break;
-      }
+  http.begin(client, url);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpResponseCode = http.POST(postData);
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    if (httpResponseCode == 200 || httpResponseCode == 201) {
+      String response = http.getString();
+      Serial.println("Server Response: " + response);
+      tone(BUZZER_PIN, 2500, 700); // success beep
     } else {
-      Serial.print("HTTP GET Failed: ");
-      Serial.println(http.errorToString(httpResponseCode));
-      // Fast failure beep
-      for (int i = 0; i < 3; i++) {
-        tone(BUZZER_PIN, 1000);
-        delay(100);
-        noTone(BUZZER_PIN);
-        delay(100);
-      }
-      break;
+      Serial.println("Error response from server.");
+      tone(BUZZER_PIN, 500, 1000); // failure beep
     }
-  }
-
-  if (redirectCount >= MAX_REDIRECTS) {
-    Serial.println("Too many redirects. Aborting request.");
-    tone(BUZZER_PIN, 500, 1000);
+  } else {
+    Serial.print("HTTP POST Failed: ");
+    Serial.println(http.errorToString(httpResponseCode));
+    for (int i = 0; i < 3; i++) {
+      tone(BUZZER_PIN, 1000);
+      delay(100);
+      noTone(BUZZER_PIN);
+      delay(100);
+    }
   }
 
   http.end();
@@ -90,7 +73,6 @@ void setup() {
   Serial.begin(115200);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // WiFi setup with WiFiManager
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(120);
 
@@ -105,10 +87,8 @@ void setup() {
     while (1);
   }
 
-  Serial.println("WiFi connected!");
-  Serial.println("IP: " + WiFi.localIP().toString());
+  Serial.println("WiFi connected! IP: " + WiFi.localIP().toString());
 
-  // PN532 setup
   nfc.begin();
   uint32_t versiondata = nfc.getFirmwareVersion();
   if (!versiondata) {
@@ -124,12 +104,7 @@ void setup() {
 }
 
 void loop() {
-  uint8_t success;
-  uint8_t uid[7];
-  uint8_t uidLength;
-
-  success = nfc.inListPassiveTarget();
-  if (!success) {
+  if (!nfc.inListPassiveTarget()) {
     delay(500);
     return;
   }
@@ -140,65 +115,70 @@ void loop() {
   uint8_t responseLength = sizeof(response);
 
   // Select NDEF application
-  uint8_t selectApdu[] = { 0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01, 0x00 };
-  success = nfc.inDataExchange(selectApdu, sizeof(selectApdu), response, &responseLength);
-
-  if (!success || responseLength < 2 || response[responseLength - 2] != 0x90) {
+  uint8_t selectApdu[] = {0x00,0xA4,0x04,0x00,0x07,0xD2,0x76,0x00,0x00,0x85,0x01,0x01,0x00};
+  if (!nfc.inDataExchange(selectApdu,sizeof(selectApdu),response,&responseLength) || responseLength < 2 || response[responseLength-2] != 0x90) {
     Serial.println("Failed to select NDEF app.");
-    tone(BUZZER_PIN, 1000, 500);
+    tone(BUZZER_PIN,1000,500);
     return;
   }
 
-  // Select NDEF file (0xE104)
-  uint8_t selectFileApdu[] = { 0x00, 0xA4, 0x00, 0x0C, 0x02, 0xE1, 0x04 };
+  // Select NDEF file
+  uint8_t selectFileApdu[] = {0x00,0xA4,0x00,0x0C,0x02,0xE1,0x04};
   responseLength = sizeof(response);
-  success = nfc.inDataExchange(selectFileApdu, sizeof(selectFileApdu), response, &responseLength);
-
-  if (!success || responseLength < 2 || response[responseLength - 2] != 0x90) {
+  if (!nfc.inDataExchange(selectFileApdu,sizeof(selectFileApdu),response,&responseLength) || responseLength < 2 || response[responseLength-2] != 0x90) {
     Serial.println("Failed to select NDEF file.");
-    tone(BUZZER_PIN, 1000, 500);
+    tone(BUZZER_PIN,1000,500);
     return;
   }
 
   // Read NDEF length
-  uint8_t readNlenApdu[] = { 0x00, 0xB0, 0x00, 0x00, 0x02 };
+  uint8_t readNlenApdu[] = {0x00,0xB0,0x00,0x00,0x02};
   responseLength = sizeof(response);
-  success = nfc.inDataExchange(readNlenApdu, sizeof(readNlenApdu), response, &responseLength);
-
-  if (!success || responseLength < 2) {
+  if (!nfc.inDataExchange(readNlenApdu,sizeof(readNlenApdu),response,&responseLength) || responseLength < 2) {
     Serial.println("Failed to read NDEF length.");
-    tone(BUZZER_PIN, 1000, 500);
+    tone(BUZZER_PIN,1000,500);
     return;
   }
 
-  uint16_t ndefLength = (response[0] << 8) | response[1];
+  uint16_t ndefLength = (response[0]<<8) | response[1];
   Serial.println("NDEF length: " + String(ndefLength));
 
-  // Read NDEF payload in chunks
+  // Read NDEF payload
   String payload = "";
   uint16_t offset = 0;
   while (offset < ndefLength) {
     uint8_t chunkSize = (ndefLength - offset > 240) ? 240 : (ndefLength - offset);
-    uint8_t readApdu[] = { 0x00, 0xB0, (uint8_t)(offset >> 8), (uint8_t)(offset & 0xFF), chunkSize };
+    uint8_t readApdu[] = {0x00,0xB0,(uint8_t)(offset>>8),(uint8_t)(offset&0xFF),chunkSize};
     responseLength = sizeof(response);
 
-    success = nfc.inDataExchange(readApdu, sizeof(readApdu), response, &responseLength);
-    if (!success || responseLength < 2 || response[responseLength - 2] != 0x90) {
+    if (!nfc.inDataExchange(readApdu,sizeof(readApdu),response,&responseLength) || responseLength < 2 || response[responseLength-2] != 0x90) {
       Serial.println("Failed reading NDEF chunk.");
-      tone(BUZZER_PIN, 1000, 500);
+      tone(BUZZER_PIN,1000,500);
       return;
     }
 
-    for (int i = 0; i < responseLength - 2; i++) {
+    for (int i=0; i<responseLength-2; i++) {
       payload += (char)response[i];
     }
     offset += chunkSize;
   }
 
-  Serial.println("NDEF Payload: " + payload);
+  Serial.println("Raw NDEF Payload: " + payload);
 
-  // Send payload via GET request
-  sendPayload(payload);
+  // --- CLEAN payload: keep only last 24 chars (MongoDB ObjectId) ---
+  String userId = "";
+  if (payload.length() >= 24) {
+    userId = payload.substring(payload.length() - 24);
+  } else {
+    Serial.println("Invalid payload length");
+    tone(BUZZER_PIN,500,1000);
+    return;
+  }
 
-  delay(1000); // Wait before next card read
+  Serial.println("Clean userId: " + userId);
+
+  // Send POST request
+  sendPayload(userId);
+
+  delay(1000);
 }
